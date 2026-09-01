@@ -1,5 +1,5 @@
 // この名前を変更すると、新版のinstall後に旧キャッシュがactivateで削除される。
-const CACHE_NAME = "countdown-static-v2";
+const CACHE_NAME = "countdown-static-v3";
 const CACHE_PREFIX = "countdown-static-";
 const APP_SHELL = [
   "./",
@@ -12,6 +12,7 @@ const APP_SHELL = [
   "./icons/apple-touch-icon.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  "./icons/qr-github-pages.png",
 ];
 
 self.addEventListener("install", (event) => {
