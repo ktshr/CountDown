@@ -12,6 +12,16 @@ import {
   MAX_NAME_LENGTH,
   MAX_TIMERS,
 } from "./storage.js";
+import { createQrImageDataUrl, decodeQrImageFile } from "./qr-code.js";
+import {
+  createQrPayload,
+  mergeImportedTimers,
+  parseQrPayload,
+  parseTimerJson,
+  serializeTimers,
+} from "./transfer.js";
+
+const MAX_JSON_FILE_BYTES = 1024 * 1024;
 
 const elements = {
   openButton: document.querySelector("#open-form-button"),
@@ -34,6 +44,19 @@ const elements = {
   deleteName: document.querySelector("#delete-name"),
   deleteCancel: document.querySelector("#delete-cancel"),
   deleteConfirm: document.querySelector("#delete-confirm"),
+  openShareButton: document.querySelector("#open-share-button"),
+  shareDialog: document.querySelector("#share-dialog"),
+  closeShareButton: document.querySelector("#close-share-button"),
+  shareDoneButton: document.querySelector("#share-done-button"),
+  showShareQrButton: document.querySelector("#show-share-qr-button"),
+  exportJsonButton: document.querySelector("#export-json-button"),
+  scanQrButton: document.querySelector("#scan-qr-button"),
+  importJsonButton: document.querySelector("#import-json-button"),
+  qrImageInput: document.querySelector("#qr-image-input"),
+  jsonFileInput: document.querySelector("#json-file-input"),
+  shareQrOutput: document.querySelector("#share-qr-output"),
+  shareQrImage: document.querySelector("#share-qr-image"),
+  shareMessage: document.querySelector("#share-message"),
 };
 
 let timers = [];
@@ -49,6 +72,17 @@ function showMessage(text, kind = "info") {
 function showFormError(text) {
   elements.formError.textContent = text;
   elements.formError.hidden = !text;
+}
+
+function showShareMessage(text, kind = "info") {
+  elements.shareMessage.textContent = text;
+  elements.shareMessage.dataset.kind = kind;
+  elements.shareMessage.hidden = !text;
+}
+
+function clearShareQr() {
+  elements.shareQrImage.removeAttribute("src");
+  elements.shareQrOutput.hidden = true;
 }
 
 function getSortedTimers() {
@@ -83,6 +117,9 @@ function render() {
   elements.empty.hidden = timers.length !== 0;
   elements.openButton.disabled = atLimit;
   elements.limitMessage.hidden = !atLimit;
+  const hasTimers = timers.length > 0;
+  elements.showShareQrButton.disabled = !hasTimers;
+  elements.exportJsonButton.disabled = !hasTimers;
 }
 
 function openForm(timer = null) {
@@ -191,6 +228,116 @@ function confirmDelete() {
   }
 }
 
+function openShareDialog() {
+  clearShareQr();
+  showShareMessage("");
+  elements.shareDialog.showModal();
+  elements.closeShareButton.focus();
+}
+
+function closeShareDialog() {
+  elements.shareDialog.close();
+}
+
+function showShareQr() {
+  try {
+    const payload = createQrPayload(timers);
+    elements.shareQrImage.src = createQrImageDataUrl(payload);
+    elements.shareQrOutput.hidden = false;
+    showShareMessage(`${timers.length}件のタイマーを共有するQRコードを作成しました。`, "success");
+  } catch (error) {
+    clearShareQr();
+    const message = String(error?.message ?? error);
+    const guidance = message.includes("overflow")
+      ? "登録内容がQRコードの容量を超えています。JSONファイルをご利用ください。"
+      : message;
+    showShareMessage(`⚠ ${guidance}`, "error");
+  }
+}
+
+function backupFileName(now = new Date()) {
+  const timestamp = now.toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
+  return `countdown-backup-${timestamp}.json`;
+}
+
+function exportJson() {
+  try {
+    const blob = new Blob([serializeTimers(timers)], { type: "application/json;charset=utf-8" });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = backupFileName();
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    showShareMessage(`${timers.length}件のJSONバックアップを書き出しました。`, "success");
+  } catch (error) {
+    showShareMessage(`⚠ ${error.message}`, "error");
+  }
+}
+
+function importTimers(importedTimers, sourceLabel) {
+  const result = mergeImportedTimers(timers, importedTimers);
+  const changeCount = result.added + result.updated;
+  if (changeCount === 0) {
+    const reason = result.omitted > 0
+      ? `登録上限のため${result.omitted}件を追加できません。`
+      : "取り込む必要がある新しい内容はありません。";
+    showShareMessage(reason, "warning");
+    return;
+  }
+
+  const details = [
+    `追加${result.added}件`,
+    `更新${result.updated}件`,
+    `変更なし${result.unchanged}件`,
+    `上限により除外${result.omitted}件`,
+  ].join("、");
+  if (!window.confirm(`${sourceLabel}からタイマーを取り込みますか？\n${details}`)) {
+    showShareMessage("読み込みをキャンセルしました。", "info");
+    return;
+  }
+
+  try {
+    timers = repository.save(result.timers);
+    clearShareQr();
+    render();
+    showShareMessage(`タイマーを取り込みました（${details}）。`, "success");
+    showMessage("共有データを取り込みました。", "success");
+  } catch (error) {
+    showShareMessage(`⚠ ${error.message}`, "error");
+  }
+}
+
+async function handleQrImage(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  showShareMessage("QRコード画像を解析しています…", "info");
+  try {
+    const payload = await decodeQrImageFile(file);
+    importTimers(parseQrPayload(payload), "QRコード");
+  } catch (error) {
+    showShareMessage(`⚠ ${error.message}`, "error");
+  }
+}
+
+async function handleJsonFile(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  if (file.size > MAX_JSON_FILE_BYTES) {
+    showShareMessage("⚠ JSONファイルは1MB以下にしてください。", "error");
+    return;
+  }
+  try {
+    importTimers(parseTimerJson(await file.text()), "JSONファイル");
+  } catch (error) {
+    showShareMessage(`⚠ ${error.message}`, "error");
+  }
+}
+
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
@@ -213,12 +360,25 @@ function init() {
   }
   render();
   elements.openButton.addEventListener("click", () => openForm());
+  elements.openShareButton.addEventListener("click", openShareDialog);
   elements.closeButton.addEventListener("click", closeForm);
   elements.cancelButton.addEventListener("click", closeForm);
   elements.form.addEventListener("submit", saveForm);
   elements.list.addEventListener("click", handleListClick);
   elements.deleteCancel.addEventListener("click", () => elements.deleteDialog.close());
   elements.deleteConfirm.addEventListener("click", confirmDelete);
+  elements.closeShareButton.addEventListener("click", closeShareDialog);
+  elements.shareDoneButton.addEventListener("click", closeShareDialog);
+  elements.showShareQrButton.addEventListener("click", showShareQr);
+  elements.exportJsonButton.addEventListener("click", exportJson);
+  elements.scanQrButton.addEventListener("click", () => elements.qrImageInput.click());
+  elements.importJsonButton.addEventListener("click", () => elements.jsonFileInput.click());
+  elements.qrImageInput.addEventListener("change", handleQrImage);
+  elements.jsonFileInput.addEventListener("change", handleJsonFile);
+  elements.shareDialog.addEventListener("close", () => {
+    clearShareQr();
+    showShareMessage("");
+  });
   elements.deleteDialog.addEventListener("close", () => {
     deleteCandidateId = null;
     elements.deleteName.textContent = "";

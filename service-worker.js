@@ -1,5 +1,5 @@
 // この名前を変更すると、新版のinstall後に旧キャッシュがactivateで削除される。
-const CACHE_NAME = "countdown-static-v3";
+const CACHE_NAME = "countdown-static-v4";
 const CACHE_PREFIX = "countdown-static-";
 const APP_SHELL = [
   "./",
@@ -7,12 +7,16 @@ const APP_SHELL = [
   "./css/styles.css",
   "./js/app.js",
   "./js/countdown.js",
+  "./js/qr-code.js",
   "./js/storage.js",
+  "./js/transfer.js",
   "./manifest.webmanifest",
   "./icons/apple-touch-icon.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/qr-github-pages.png",
+  "./vendor/qrcode-generator-1.4.4.js",
+  "./vendor/jsQR-8e6a036.js",
 ];
 
 self.addEventListener("install", (event) => {
