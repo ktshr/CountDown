@@ -27,16 +27,6 @@ tests/countdown.test.js     Node.js標準テスト
 package.json               ES Modulesとテストコマンド
 ```
 
-## ローカルで起動する
-
-Service Workerは`file://`では動かないため、必ずHTTPサーバー経由で確認します。Python 3がある場合はプロジェクトのルートで次を実行します。
-
-```sh
-python3 -m http.server 8080
-```
-
-Safariで `http://localhost:8080/` を開いてください。Service WorkerはlocalhostまたはHTTPSでのみ利用できます。
-
 ## テスト
 
 Node.js 20以降を推奨します。追加パッケージのインストールは不要です。
