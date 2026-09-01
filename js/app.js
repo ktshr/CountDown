@@ -50,8 +50,6 @@ const elements = {
   shareDoneButton: document.querySelector("#share-done-button"),
   showShareQrButton: document.querySelector("#show-share-qr-button"),
   exportJsonButton: document.querySelector("#export-json-button"),
-  scanQrButton: document.querySelector("#scan-qr-button"),
-  importJsonButton: document.querySelector("#import-json-button"),
   qrImageInput: document.querySelector("#qr-image-input"),
   jsonFileInput: document.querySelector("#json-file-input"),
   shareQrOutput: document.querySelector("#share-qr-output"),
@@ -260,19 +258,37 @@ function backupFileName(now = new Date()) {
   return `countdown-backup-${timestamp}.json`;
 }
 
-function exportJson() {
+function downloadJsonFile(contents, fileName) {
+  const blob = new Blob([contents], { type: "application/json;charset=utf-8" });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+}
+
+async function exportJson() {
   try {
-    const blob = new Blob([serializeTimers(timers)], { type: "application/json;charset=utf-8" });
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = backupFileName();
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    const contents = serializeTimers(timers);
+    const fileName = backupFileName();
+    const file = new File([contents], fileName, { type: "application/json" });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: "カウントダウンのバックアップ",
+      });
+    } else {
+      downloadJsonFile(contents, fileName);
+    }
     showShareMessage(`${timers.length}件のJSONバックアップを書き出しました。`, "success");
   } catch (error) {
+    if (error.name === "AbortError") {
+      showShareMessage("JSONの共有をキャンセルしました。", "info");
+      return;
+    }
     showShareMessage(`⚠ ${error.message}`, "error");
   }
 }
@@ -371,8 +387,6 @@ function init() {
   elements.shareDoneButton.addEventListener("click", closeShareDialog);
   elements.showShareQrButton.addEventListener("click", showShareQr);
   elements.exportJsonButton.addEventListener("click", exportJson);
-  elements.scanQrButton.addEventListener("click", () => elements.qrImageInput.click());
-  elements.importJsonButton.addEventListener("click", () => elements.jsonFileInput.click());
   elements.qrImageInput.addEventListener("change", handleQrImage);
   elements.jsonFileInput.addEventListener("change", handleJsonFile);
   elements.shareDialog.addEventListener("close", () => {

@@ -125,12 +125,16 @@
       <section class="share-section" aria-labelledby="share-receive-title">
         <h3 id="share-receive-title">この端末へ読み込む</h3>
         <div class="share-action-grid">
-          <button id="scan-qr-button" class="secondary-button" type="button">QRを読み込む</button>
-          <button id="import-json-button" class="secondary-button" type="button">JSONを読み込む</button>
+          <label class="file-button secondary-button">
+            <span>QR画像を撮影・選択</span>
+            <input id="qr-image-input" type="file" accept="image/*" aria-label="共有QRコードを撮影または画像から選択">
+          </label>
+          <label class="file-button secondary-button">
+            <span>JSONを読み込む</span>
+            <input id="json-file-input" type="file" accept="application/json,.json" aria-label="JSONバックアップを選択">
+          </label>
         </div>
-        <input id="qr-image-input" type="file" accept="image/*" capture="environment" hidden>
-        <input id="json-file-input" type="file" accept="application/json,.json" hidden>
-        <p class="share-note">同じIDは更新日時が新しい内容を採用します。新しいタイマーは合計10件まで追加します。</p>
+        <p class="share-note">iPhoneでは「写真を撮る」で別端末のQRを撮影するか、保存済みのQR画像を選択します。同じIDは更新日時が新しい内容を採用し、新しいタイマーは合計10件まで追加します。</p>
       </section>
 
       <div id="share-message" class="share-message" role="status" aria-live="polite" hidden></div>
