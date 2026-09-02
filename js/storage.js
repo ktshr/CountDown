@@ -1,5 +1,5 @@
 export const STORAGE_KEY = "countdown-timers-v1";
-export const MAX_TIMERS = 10;
+export const MAX_TIMERS = 20;
 export const MAX_NAME_LENGTH = 80;
 const MAX_ID_LENGTH = 128;
 

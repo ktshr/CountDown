@@ -18,14 +18,10 @@ import {
   decodeQrImageSource,
 } from "./qr-code.js";
 import {
-  createQrPayload,
+  createQrShare,
   mergeImportedTimers,
   parseQrPayload,
-  parseTimerJson,
-  serializeTimers,
 } from "./transfer.js";
-
-const MAX_JSON_FILE_BYTES = 1024 * 1024;
 
 const elements = {
   openButton: document.querySelector("#open-form-button"),
@@ -53,9 +49,7 @@ const elements = {
   closeShareButton: document.querySelector("#close-share-button"),
   shareDoneButton: document.querySelector("#share-done-button"),
   showShareQrButton: document.querySelector("#show-share-qr-button"),
-  exportJsonButton: document.querySelector("#export-json-button"),
   qrImageInput: document.querySelector("#qr-image-input"),
-  jsonFileInput: document.querySelector("#json-file-input"),
   startQrCameraButton: document.querySelector("#start-qr-camera-button"),
   stopQrCameraButton: document.querySelector("#stop-qr-camera-button"),
   qrCameraReader: document.querySelector("#qr-camera-reader"),
@@ -130,12 +124,11 @@ function render() {
   elements.limitMessage.hidden = !atLimit;
   const hasTimers = timers.length > 0;
   elements.showShareQrButton.disabled = !hasTimers;
-  elements.exportJsonButton.disabled = !hasTimers;
 }
 
 function openForm(timer = null) {
   if (!timer && !canAddTimer(timers)) {
-    showMessage("登録できるタイマーは最大10件です。", "warning");
+    showMessage(`登録できるタイマーは最大${MAX_TIMERS}件です。`, "warning");
     return;
   }
   const limits = getInputLimits();
@@ -191,7 +184,7 @@ function saveForm(event) {
 
   const existing = timers.find((timer) => timer.id === id);
   if (!existing && !canAddTimer(timers)) {
-    showFormError("⚠ 登録できるタイマーは最大10件です。");
+    showFormError(`⚠ 登録できるタイマーは最大${MAX_TIMERS}件です。`);
     return;
   }
 
@@ -343,57 +336,21 @@ async function startQrCamera() {
 
 function showShareQr() {
   try {
-    const payload = createQrPayload(timers);
-    elements.shareQrImage.src = createQrImageDataUrl(payload);
+    // 目標日時が早いタイマーから、1枚のQR容量を超えない最大件数まで収録する。
+    const share = createQrShare(getSortedTimers());
+    elements.shareQrImage.src = createQrImageDataUrl(share.payload);
     elements.shareQrOutput.hidden = false;
-    showShareMessage(`${timers.length}件のタイマーを共有するQRコードを作成しました。`, "success");
+    if (share.omittedCount > 0) {
+      showShareMessage(
+        `${share.includedCount}件をQRコードに収録しました。容量のため${share.omittedCount}件は含まれていません。`,
+        "warning",
+      );
+    } else {
+      showShareMessage(`${share.includedCount}件のタイマーを共有するQRコードを作成しました。`, "success");
+    }
   } catch (error) {
     clearShareQr();
-    const message = String(error?.message ?? error);
-    const guidance = message.includes("overflow")
-      ? "登録内容がQRコードの容量を超えています。JSONファイルをご利用ください。"
-      : message;
-    showShareMessage(`⚠ ${guidance}`, "error");
-  }
-}
-
-function backupFileName(now = new Date()) {
-  const timestamp = now.toISOString().replace(/[-:]/g, "").replace("T", "-").slice(0, 15);
-  return `countdown-backup-${timestamp}.json`;
-}
-
-function downloadJsonFile(contents, fileName) {
-  const blob = new Blob([contents], { type: "application/json;charset=utf-8" });
-  const objectUrl = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = objectUrl;
-  link.download = fileName;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
-}
-
-async function exportJson() {
-  try {
-    const contents = serializeTimers(timers);
-    const fileName = backupFileName();
-    const file = new File([contents], fileName, { type: "application/json" });
-    if (navigator.canShare?.({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: "カウントダウンのバックアップ",
-      });
-    } else {
-      downloadJsonFile(contents, fileName);
-    }
-    showShareMessage(`${timers.length}件のJSONバックアップを書き出しました。`, "success");
-  } catch (error) {
-    if (error.name === "AbortError") {
-      showShareMessage("JSONの共有をキャンセルしました。", "info");
-      return;
-    }
-    showShareMessage(`⚠ ${error.message}`, "error");
+    showShareMessage(`⚠ ${String(error?.message ?? error)}`, "error");
   }
 }
 
@@ -443,21 +400,6 @@ async function handleQrImage(event) {
   }
 }
 
-async function handleJsonFile(event) {
-  const file = event.target.files?.[0];
-  event.target.value = "";
-  if (!file) return;
-  if (file.size > MAX_JSON_FILE_BYTES) {
-    showShareMessage("⚠ JSONファイルは1MB以下にしてください。", "error");
-    return;
-  }
-  try {
-    importTimers(parseTimerJson(await file.text()), "JSONファイル");
-  } catch (error) {
-    showShareMessage(`⚠ ${error.message}`, "error");
-  }
-}
-
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   window.addEventListener("load", () => {
@@ -490,11 +432,9 @@ function init() {
   elements.closeShareButton.addEventListener("click", closeShareDialog);
   elements.shareDoneButton.addEventListener("click", closeShareDialog);
   elements.showShareQrButton.addEventListener("click", showShareQr);
-  elements.exportJsonButton.addEventListener("click", exportJson);
   elements.startQrCameraButton.addEventListener("click", startQrCamera);
   elements.stopQrCameraButton.addEventListener("click", () => stopQrCamera());
   elements.qrImageInput.addEventListener("change", handleQrImage);
-  elements.jsonFileInput.addEventListener("change", handleJsonFile);
   elements.shareDialog.addEventListener("close", () => {
     stopQrCamera();
     clearShareQr();

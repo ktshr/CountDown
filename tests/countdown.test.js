@@ -53,10 +53,10 @@ test("うるう日から99年後は対象年の2月末になる", () => {
   });
 });
 
-test("最大10件まで登録でき、11件目は追加できない", () => {
-  assert.equal(MAX_TIMERS, 10);
-  assert.equal(canAddTimer(Array.from({ length: 9 })), true);
-  assert.equal(canAddTimer(Array.from({ length: 10 })), false);
+test("最大20件まで登録でき、21件目は追加できない", () => {
+  assert.equal(MAX_TIMERS, 20);
+  assert.equal(canAddTimer(Array.from({ length: 19 })), true);
+  assert.equal(canAddTimer(Array.from({ length: 20 })), false);
 });
 
 function validTimer(id) {
@@ -69,12 +69,12 @@ function validTimer(id) {
   };
 }
 
-test("不正・重複・11件目の保存データを安全に除外する", () => {
+test("不正・重複・21件目の保存データを安全に除外する", () => {
   const source = [null, { id: "bad" }, validTimer("a"), validTimer("a")];
-  for (let index = 0; index < 12; index += 1) source.push(validTimer(`id-${index}`));
+  for (let index = 0; index < 22; index += 1) source.push(validTimer(`id-${index}`));
   const result = sanitizeTimers(source);
-  assert.equal(result.length, 10);
-  assert.equal(new Set(result.map((item) => item.id)).size, 10);
+  assert.equal(result.length, 20);
+  assert.equal(new Set(result.map((item) => item.id)).size, 20);
 });
 
 test("保存データの名称長とISO日時形式を厳格に検証する", () => {
@@ -82,10 +82,10 @@ test("保存データの名称長とISO日時形式を厳格に検証する", ()
   assert.deepEqual(sanitizeTimers([{ ...validTimer("date"), targetAt: "2030-01-01" }]), []);
 });
 
-test("保存処理でも11件目を拒否する", () => {
+test("保存処理でも21件目を拒否する", () => {
   const repository = createTimerStorage({ setItem() {} });
-  const eleven = Array.from({ length: 11 }, (_, index) => validTimer(`id-${index}`));
-  assert.throws(() => repository.save(eleven), /保存内容を検証できません/);
+  const twentyOne = Array.from({ length: 21 }, (_, index) => validTimer(`id-${index}`));
+  assert.throws(() => repository.save(twentyOne), /保存内容を検証できません/);
 });
 
 test("JSON解析エラーと配列でないデータから安全に起動する", () => {

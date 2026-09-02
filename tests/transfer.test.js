@@ -3,11 +3,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import {
-  createQrPayload,
+  createQrShare,
   mergeImportedTimers,
   parseQrPayload,
-  parseTimerJson,
-  serializeTimers,
 } from "../js/transfer.js";
 
 function timer(id, name = `予定${id}`, updatedAt = "2026-01-01T00:00:00.000Z") {
@@ -20,21 +18,22 @@ function timer(id, name = `予定${id}`, updatedAt = "2026-01-01T00:00:00.000Z")
   };
 }
 
-test("JSONバックアップを往復できる", () => {
-  const timers = [timer("a", "日本語の予定")];
-  assert.deepEqual(parseTimerJson(serializeTimers(timers, 0)), timers);
-});
-
-test("不正なJSON形式を拒否する", () => {
-  assert.throws(() => parseTimerJson("{"), /解析できません/);
-  assert.throws(() => parseTimerJson(JSON.stringify({ schema: "other", version: 1, timers: [] })), /対応している/);
-});
-
 test("QR共有データを日本語を含めて往復できる", () => {
   const timers = [timer("a", "旅行の出発✈️")];
-  assert.deepEqual(parseQrPayload(createQrPayload(timers)), timers);
+  const share = createQrShare(timers);
+  assert.deepEqual(parseQrPayload(share.payload), timers);
+  assert.equal(share.includedCount, 1);
+  assert.equal(share.omittedCount, 0);
   assert.throws(() => parseQrPayload("https://example.com/"), /共有QRコードではありません/);
   assert.throws(() => parseQrPayload("CDT1:[[\"a\",\"予定\",1e100,0,0]]"), /不正なタイマー/);
+});
+
+test("QR容量を超える場合は収録可能な件数までに制限する", () => {
+  const timers = Array.from({ length: 20 }, (_, index) => timer(`id-${index}`, "長".repeat(80)));
+  const share = createQrShare(timers);
+  assert.ok(share.includedCount > 0 && share.includedCount < 20);
+  assert.equal(share.includedCount + share.omittedCount, 20);
+  assert.equal(parseQrPayload(share.payload).length, share.includedCount);
 });
 
 test("取込時は新規追加し、同じIDでは新しい更新日時を採用する", () => {
@@ -49,10 +48,10 @@ test("取込時は新規追加し、同じIDでは新しい更新日時を採用
   assert.equal(result.timers.find((item) => item.id === "same").name, "新しい名称");
 });
 
-test("取込後も最大10件を超えない", () => {
-  const current = Array.from({ length: 10 }, (_, index) => timer(`current-${index}`));
+test("取込後も最大20件を超えない", () => {
+  const current = Array.from({ length: 20 }, (_, index) => timer(`current-${index}`));
   const result = mergeImportedTimers(current, [timer("new")]);
-  assert.equal(result.timers.length, 10);
+  assert.equal(result.timers.length, 20);
   assert.equal(result.omitted, 1);
 });
 
@@ -64,7 +63,7 @@ test("同梱ライブラリで生成したQRを同梱ライブラリで読み取
   vm.runInContext(readFileSync(new URL("../vendor/jsQR-8e6a036.js", import.meta.url), "utf8"), context);
   context.qrcode.stringToBytes = context.qrcode.stringToBytesFuncs["UTF-8"];
 
-  const payload = createQrPayload([timer("a", "日本語の予定")]);
+  const payload = createQrShare([timer("a", "日本語の予定")]).payload;
   const qr = context.qrcode(0, "L");
   qr.addData(payload, "Byte");
   qr.make();

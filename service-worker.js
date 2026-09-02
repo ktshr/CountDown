@@ -1,5 +1,5 @@
 // この名前を変更すると、新版のinstall後に旧キャッシュがactivateで削除される。
-const CACHE_NAME = "countdown-static-v6";
+const CACHE_NAME = "countdown-static-v7";
 const CACHE_PREFIX = "countdown-static-";
 const APP_SHELL = [
   "./",
