@@ -58,24 +58,30 @@ function loadImage(file) {
   });
 }
 
-export async function decodeQrImageFile(file) {
-  if (!(file instanceof Blob)) throw new Error("QRコード画像を選択してください。");
-  if (file.size > MAX_IMAGE_BYTES) throw new Error("QRコード画像は20MB以下にしてください。");
+// videoと画像の両方を同じ経路で解析し、カメラ走査中はcanvasを再利用できるようにする。
+export function decodeQrImageSource(source, sourceWidth, sourceHeight, canvas, maxDimension = MAX_DECODE_DIMENSION) {
   const decoder = globalThis.jsQR;
   if (typeof decoder !== "function") throw new Error("QRコード読取機能を読み込めませんでした。");
+  if (!sourceWidth || !sourceHeight) return null;
 
-  const image = await loadImage(file);
-  const ratio = Math.min(1, MAX_DECODE_DIMENSION / Math.max(image.naturalWidth, image.naturalHeight));
-  const width = Math.max(1, Math.round(image.naturalWidth * ratio));
-  const height = Math.max(1, Math.round(image.naturalHeight * ratio));
-  const canvas = document.createElement("canvas");
+  const ratio = Math.min(1, maxDimension / Math.max(sourceWidth, sourceHeight));
+  const width = Math.max(1, Math.round(sourceWidth * ratio));
+  const height = Math.max(1, Math.round(sourceHeight * ratio));
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d", { willReadFrequently: true });
   if (!context) throw new Error("QRコード画像を解析できませんでした。");
-  context.drawImage(image, 0, 0, width, height);
+  context.drawImage(source, 0, 0, width, height);
   const pixels = context.getImageData(0, 0, width, height);
-  const result = decoder(pixels.data, width, height, { inversionAttempts: "attemptBoth" });
-  if (!result?.data) throw new Error("画像から共有QRコードを見つけられませんでした。");
-  return result.data;
+  return decoder(pixels.data, width, height, { inversionAttempts: "attemptBoth" })?.data ?? null;
+}
+
+export async function decodeQrImageFile(file) {
+  if (!(file instanceof Blob)) throw new Error("QRコード画像を選択してください。");
+  if (file.size > MAX_IMAGE_BYTES) throw new Error("QRコード画像は20MB以下にしてください。");
+  const image = await loadImage(file);
+  const canvas = document.createElement("canvas");
+  const payload = decodeQrImageSource(image, image.naturalWidth, image.naturalHeight, canvas);
+  if (!payload) throw new Error("画像から共有QRコードを見つけられませんでした。");
+  return payload;
 }

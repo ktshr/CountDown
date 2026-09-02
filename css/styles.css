@@ -138,6 +138,12 @@ dialog::backdrop { background: rgb(14 22 38 / 56%); backdrop-filter: blur(3px); 
 .share-note, .share-qr-output p { color: var(--muted); font-size: .88rem; line-height: 1.6; }
 .share-qr-output { margin-top: 16px; text-align: center; }
 .share-qr-output img { display: block; width: min(100%, 420px); height: auto; margin-inline: auto; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+.qr-camera-reader { margin-top: 14px; }
+.qr-video-frame { position: relative; width: min(100%, 480px); margin-inline: auto; overflow: hidden; border-radius: 14px; background: #090b10; aspect-ratio: 4 / 3; }
+.qr-video-frame video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.qr-scan-frame { position: absolute; inset: 12%; border: 3px solid #fff; border-radius: 16px; box-shadow: 0 0 0 999px rgb(0 0 0 / 28%); pointer-events: none; }
+.qr-camera-reader > button { width: 100%; }
+.json-import-row { display: grid; gap: 8px; align-items: center; margin-top: 14px; color: var(--muted); font-size: .88rem; }
 .share-message { margin-top: 14px; border: 1px solid; border-left-width: 5px; border-radius: 10px; padding: 12px 14px; font-weight: 650; }
 .share-message[data-kind="error"] { border-color: #e9a8a3; background: #fff1f0; color: #7a1d16; }
 .share-message[data-kind="success"] { border-color: #77bfa5; background: #ecfdf5; color: #126347; }
@@ -152,6 +158,7 @@ dialog::backdrop { background: rgb(14 22 38 / 56%); backdrop-filter: blur(3px); 
   .timer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .qr-guide { grid-template-columns: minmax(0, 1fr) 220px; }
   .share-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .json-import-row { grid-template-columns: minmax(0, 1fr) minmax(180px, auto); }
 }
 @media (min-width: 940px) { .timer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: no-preference) {

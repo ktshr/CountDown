@@ -118,23 +118,35 @@
         </div>
         <div id="share-qr-output" class="share-qr-output" hidden>
           <img id="share-qr-image" width="420" height="420" alt="登録タイマーを共有するQRコード">
-          <p>別の端末で「QRを読み込む」を選び、このQRコードを撮影してください。</p>
+          <p>これは標準カメラ用のWebリンクではありません。別の端末でこのアプリの「カメラでQRを読み取る」を開き、QRコードを枠内へ映してください。</p>
         </div>
       </section>
 
       <section class="share-section" aria-labelledby="share-receive-title">
         <h3 id="share-receive-title">この端末へ読み込む</h3>
         <div class="share-action-grid">
+          <button id="start-qr-camera-button" class="primary-button" type="button">カメラでQRを読み取る</button>
           <label class="file-button secondary-button">
-            <span>QR画像を撮影・選択</span>
-            <input id="qr-image-input" type="file" accept="image/*" aria-label="共有QRコードを撮影または画像から選択">
+            <span>QR画像を選択</span>
+            <input id="qr-image-input" type="file" accept="image/*" aria-label="保存済みの共有QRコード画像を選択">
           </label>
+        </div>
+        <div id="qr-camera-reader" class="qr-camera-reader" hidden>
+          <div class="qr-video-frame">
+            <video id="qr-camera-video" autoplay playsinline muted aria-label="共有QRコード読取用カメラ"></video>
+            <span class="qr-scan-frame" aria-hidden="true"></span>
+          </div>
+          <p id="qr-camera-status" class="share-note" role="status" aria-live="polite">カメラを準備しています…</p>
+          <button id="stop-qr-camera-button" class="secondary-button" type="button">カメラを停止</button>
+        </div>
+        <div class="json-import-row">
+          <span>JSONバックアップがある場合</span>
           <label class="file-button secondary-button">
             <span>JSONを読み込む</span>
             <input id="json-file-input" type="file" accept="application/json,.json" aria-label="JSONバックアップを選択">
           </label>
         </div>
-        <p class="share-note">iPhoneでは「写真を撮る」で別端末のQRを撮影するか、保存済みのQR画像を選択します。同じIDは更新日時が新しい内容を採用し、新しいタイマーは合計10件まで追加します。</p>
+        <p class="share-note">iPhone・iPadでは背面カメラを、PC・Macでは内蔵カメラを優先します。枠内へ別端末の共有QRを映すと自動検出します。同じIDは更新日時が新しい内容を採用し、新しいタイマーは合計10件まで追加します。</p>
       </section>
 
       <div id="share-message" class="share-message" role="status" aria-live="polite" hidden></div>

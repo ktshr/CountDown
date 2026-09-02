@@ -12,7 +12,11 @@ import {
   MAX_NAME_LENGTH,
   MAX_TIMERS,
 } from "./storage.js";
-import { createQrImageDataUrl, decodeQrImageFile } from "./qr-code.js";
+import {
+  createQrImageDataUrl,
+  decodeQrImageFile,
+  decodeQrImageSource,
+} from "./qr-code.js";
 import {
   createQrPayload,
   mergeImportedTimers,
@@ -52,6 +56,11 @@ const elements = {
   exportJsonButton: document.querySelector("#export-json-button"),
   qrImageInput: document.querySelector("#qr-image-input"),
   jsonFileInput: document.querySelector("#json-file-input"),
+  startQrCameraButton: document.querySelector("#start-qr-camera-button"),
+  stopQrCameraButton: document.querySelector("#stop-qr-camera-button"),
+  qrCameraReader: document.querySelector("#qr-camera-reader"),
+  qrCameraVideo: document.querySelector("#qr-camera-video"),
+  qrCameraStatus: document.querySelector("#qr-camera-status"),
   shareQrOutput: document.querySelector("#share-qr-output"),
   shareQrImage: document.querySelector("#share-qr-image"),
   shareMessage: document.querySelector("#share-message"),
@@ -60,6 +69,10 @@ const elements = {
 let timers = [];
 let deleteCandidateId = null;
 let repository = null;
+let cameraStream = null;
+let cameraScanTimer = null;
+let cameraSessionId = 0;
+const cameraCanvas = document.createElement("canvas");
 
 function showMessage(text, kind = "info") {
   elements.message.textContent = text;
@@ -237,6 +250,97 @@ function closeShareDialog() {
   elements.shareDialog.close();
 }
 
+function stopQrCamera(hideReader = true) {
+  cameraSessionId += 1;
+  if (cameraScanTimer !== null) {
+    window.clearTimeout(cameraScanTimer);
+    cameraScanTimer = null;
+  }
+  if (cameraStream) {
+    for (const track of cameraStream.getTracks()) track.stop();
+    cameraStream = null;
+  }
+  elements.qrCameraVideo.pause();
+  elements.qrCameraVideo.srcObject = null;
+  elements.startQrCameraButton.disabled = false;
+  if (hideReader) elements.qrCameraReader.hidden = true;
+}
+
+function cameraErrorMessage(error) {
+  if (!globalThis.isSecureContext) return "カメラはHTTPSの公開ページでのみ利用できます。";
+  if (error.name === "NotAllowedError") return "カメラの使用が許可されていません。Safariまたは端末の設定でカメラを許可してください。";
+  if (error.name === "NotFoundError" || error.name === "OverconstrainedError") return "利用できるカメラが見つかりませんでした。";
+  if (error.name === "NotReadableError") return "カメラを開始できませんでした。他のアプリがカメラを使用していないか確認してください。";
+  return "カメラを開始できませんでした。端末の設定を確認して再度お試しください。";
+}
+
+function scanQrCameraFrame(sessionId) {
+  if (!cameraStream || sessionId !== cameraSessionId) return;
+  try {
+    const video = elements.qrCameraVideo;
+    if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      const payload = decodeQrImageSource(video, video.videoWidth, video.videoHeight, cameraCanvas, 900);
+      if (payload) {
+        stopQrCamera();
+        showShareMessage("共有QRコードを検出しました。", "success");
+        importTimers(parseQrPayload(payload), "QRコード");
+        return;
+      }
+    }
+    cameraScanTimer = window.setTimeout(() => scanQrCameraFrame(sessionId), 160);
+  } catch (error) {
+    stopQrCamera(false);
+    elements.qrCameraStatus.textContent = `⚠ ${error.message}`;
+    showShareMessage(`⚠ ${error.message}`, "error");
+  }
+}
+
+async function startQrCamera() {
+  stopQrCamera();
+  const sessionId = ++cameraSessionId;
+  elements.startQrCameraButton.disabled = true;
+  elements.qrCameraReader.hidden = false;
+  elements.qrCameraStatus.textContent = "カメラを準備しています…";
+  showShareMessage("");
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    elements.startQrCameraButton.disabled = false;
+    const message = "このブラウザーではカメラを直接利用できません。QR画像を選択してください。";
+    elements.qrCameraStatus.textContent = message;
+    showShareMessage(`⚠ ${message}`, "error");
+    return;
+  }
+
+  // タッチ中心の端末は背面、PCは利用者側の内蔵カメラを優先する。
+  const preferredFacingMode = window.matchMedia("(pointer: coarse)").matches ? "environment" : "user";
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: { ideal: preferredFacingMode },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    });
+    if (sessionId !== cameraSessionId || !elements.shareDialog.open) {
+      for (const track of stream.getTracks()) track.stop();
+      return;
+    }
+    cameraStream = stream;
+    elements.qrCameraVideo.srcObject = stream;
+    await elements.qrCameraVideo.play();
+    elements.startQrCameraButton.disabled = false;
+    elements.qrCameraStatus.textContent = "枠内へ別端末の共有QRコードを映してください。";
+    scanQrCameraFrame(sessionId);
+  } catch (error) {
+    if (sessionId !== cameraSessionId) return;
+    stopQrCamera(false);
+    const message = cameraErrorMessage(error);
+    elements.qrCameraStatus.textContent = `⚠ ${message}`;
+    showShareMessage(`⚠ ${message}`, "error");
+  }
+}
+
 function showShareQr() {
   try {
     const payload = createQrPayload(timers);
@@ -387,9 +491,12 @@ function init() {
   elements.shareDoneButton.addEventListener("click", closeShareDialog);
   elements.showShareQrButton.addEventListener("click", showShareQr);
   elements.exportJsonButton.addEventListener("click", exportJson);
+  elements.startQrCameraButton.addEventListener("click", startQrCamera);
+  elements.stopQrCameraButton.addEventListener("click", () => stopQrCamera());
   elements.qrImageInput.addEventListener("change", handleQrImage);
   elements.jsonFileInput.addEventListener("change", handleJsonFile);
   elements.shareDialog.addEventListener("close", () => {
+    stopQrCamera();
     clearShareQr();
     showShareMessage("");
   });
@@ -397,7 +504,11 @@ function init() {
     deleteCandidateId = null;
     elements.deleteName.textContent = "";
   });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopQrCamera();
+    else render();
+  });
+  window.addEventListener("pagehide", () => stopQrCamera());
   window.addEventListener("pageshow", render);
   window.setInterval(render, 60_000);
   registerServiceWorker();
