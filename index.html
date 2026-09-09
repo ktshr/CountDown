@@ -21,6 +21,7 @@
       <p class="subtitle">大切な予定まで、あと何時間？</p>
     </div>
     <div class="header-actions">
+      <button id="open-sleep-button" class="secondary-button" type="button">睡眠時間設定</button>
       <button id="open-share-button" class="secondary-button" type="button">データ共有</button>
       <button id="open-form-button" class="primary-button" type="button">＋ 新規登録</button>
     </div>
@@ -35,6 +36,7 @@
       </div>
       <p id="limit-message" class="limit-message" hidden>登録できるタイマーは最大20件です</p>
     </section>
+    <p id="sleep-summary" class="sleep-summary">睡眠時間を差し引かない</p>
     <section id="empty-state" class="empty-state">
       <div class="empty-icon" aria-hidden="true">⌛</div>
       <h2>タイマーはまだありません</h2>
@@ -87,6 +89,35 @@
       <div class="dialog-actions">
         <button id="cancel-button" class="secondary-button" type="button">キャンセル</button>
         <button class="primary-button" type="submit">保存する</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="sleep-dialog" aria-labelledby="sleep-dialog-title">
+    <form id="sleep-form" method="dialog" novalidate>
+      <div class="dialog-heading">
+        <div><p class="eyebrow">SLEEP</p><h2 id="sleep-dialog-title">睡眠時間設定</h2></div>
+        <button id="close-sleep-button" class="icon-button" type="button" aria-label="閉じる">×</button>
+      </div>
+      <label class="check-field" for="sleep-enabled">
+        <input id="sleep-enabled" type="checkbox">
+        <span>残り時間から睡眠時間を差し引く</span>
+      </label>
+      <div class="sleep-time-grid">
+        <div class="field">
+          <label for="sleep-start">就寝時刻</label>
+          <input id="sleep-start" type="time" value="23:00" required>
+        </div>
+        <div class="field">
+          <label for="sleep-end">起床時刻</label>
+          <input id="sleep-end" type="time" value="06:00" required>
+        </div>
+      </div>
+      <p class="field-note">毎日、日本時間を基準に計算します。例：23:00〜翌06:00</p>
+      <div id="sleep-form-error" class="form-error" role="alert" hidden></div>
+      <div class="dialog-actions">
+        <button id="cancel-sleep-button" class="secondary-button" type="button">キャンセル</button>
+        <button class="primary-button" type="submit">設定を保存</button>
       </div>
     </form>
   </dialog>

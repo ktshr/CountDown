@@ -1,3 +1,5 @@
+import { getAwakeDurationMs } from "./sleep.js";
+
 // アプリ内で扱う日時は、端末設定に関係なく日本標準時に固定する。
 export const TIME_ZONE = "Asia/Tokyo";
 export const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -67,10 +69,11 @@ export function validateTarget(targetMs, nowMs = Date.now()) {
 }
 
 // Math.roundにより、30分以上を切り上げ、30分未満を切り捨てる。
-export function getCountdown(targetMs, nowMs = Date.now()) {
+export function getCountdown(targetMs, nowMs = Date.now(), sleepSettings = null) {
   const remainingMs = targetMs - nowMs;
   if (remainingMs <= 0) return { ended: true, hours: 0, label: "終了" };
-  const hours = Math.round(remainingMs / HOUR_MS);
+  const awakeMs = getAwakeDurationMs(nowMs, targetMs, sleepSettings);
+  const hours = Math.round(awakeMs / HOUR_MS);
   return { ended: false, hours, label: `残り${hours}時間` };
 }
 

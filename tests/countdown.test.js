@@ -10,6 +10,12 @@ import {
   validateTarget,
 } from "../js/countdown.js";
 import { canAddTimer, createTimerStorage, MAX_TIMERS, sanitizeTimers } from "../js/storage.js";
+import {
+  createSleepSettingsStorage,
+  formatSleepSchedule,
+  getAwakeDurationMs,
+  validateSleepSettings,
+} from "../js/sleep.js";
 
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
@@ -33,6 +39,55 @@ test("29分は残り0時間になる", () => {
 test("到達時と過去日時は終了になる", () => {
   assert.deepEqual(getCountdown(1000, 1000), { ended: true, hours: 0, label: "終了" });
   assert.equal(getCountdown(999, 1000).label, "終了");
+});
+
+test("23時から翌6時の睡眠を残り時間から差し引く", () => {
+  const settings = { enabled: true, start: "23:00", end: "06:00" };
+  const now = parseJstDateTimeLocal("2026-09-09T22:00");
+  const target = parseJstDateTimeLocal("2026-09-10T07:00");
+  assert.equal(getAwakeDurationMs(now, target, settings), 2 * HOUR);
+  assert.equal(getCountdown(target, now, settings).label, "残り2時間");
+  assert.equal(formatSleepSchedule(settings), "23:00〜翌06:00を差し引く");
+});
+
+test("複数日にまたがる睡眠時間を日ごとに差し引く", () => {
+  const settings = { enabled: true, start: "23:00", end: "06:00" };
+  const now = parseJstDateTimeLocal("2026-09-09T12:00");
+  const target = parseJstDateTimeLocal("2026-09-11T12:00");
+  assert.equal(getAwakeDurationMs(now, target, settings), 34 * HOUR);
+});
+
+test("同日内の睡眠時間と部分的な重なりを差し引く", () => {
+  const settings = { enabled: true, start: "13:00", end: "14:00" };
+  const now = parseJstDateTimeLocal("2026-09-09T12:30");
+  const target = parseJstDateTimeLocal("2026-09-09T13:30");
+  assert.equal(getAwakeDurationMs(now, target, settings), 30 * MINUTE);
+  assert.equal(getCountdown(target, now, settings).label, "残り1時間");
+});
+
+test("睡眠時間を無効にすると従来どおり全時間を数える", () => {
+  const settings = { enabled: false, start: "23:00", end: "06:00" };
+  assert.equal(getAwakeDurationMs(0, 9 * HOUR, settings), 9 * HOUR);
+  assert.equal(formatSleepSchedule(settings), "睡眠時間を差し引かない");
+});
+
+test("睡眠時間設定を検証して端末内へ保存できる", () => {
+  const values = new Map();
+  const repository = createSleepSettingsStorage({
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  });
+  const settings = { enabled: true, start: "23:00", end: "06:00" };
+  assert.deepEqual(repository.save(settings), settings);
+  assert.deepEqual(repository.load().settings, settings);
+  assert.equal(validateSleepSettings({ ...settings, end: "23:00" }).valid, false);
+});
+
+test("不正な睡眠時間の保存データから安全に起動する", () => {
+  const repository = createSleepSettingsStorage({ getItem: () => "{" });
+  const result = repository.load();
+  assert.equal(result.settings.enabled, false);
+  assert.match(result.warning, /初期設定/);
 });
 
 test("過去日時は登録できない", () => {
@@ -108,9 +163,15 @@ test("datetime-localをAsia/Tokyoとして解釈・表示する", () => {
   assert.ok(Number.isNaN(parseJstDateTimeLocal("2026-02-30T03:04")));
 });
 
-test("端末タイムゾーンが異なってもJST解釈結果は変わらない", () => {
+test("端末タイムゾーンが異なってもJST解釈と睡眠時間計算は変わらない", () => {
   const moduleUrl = new URL("../js/countdown.js", import.meta.url).href;
-  const script = `import('${moduleUrl}').then(m => process.stdout.write(String(m.parseJstDateTimeLocal('2026-07-08T09:10'))))`;
+  const sleepModuleUrl = new URL("../js/sleep.js", import.meta.url).href;
+  const script = `Promise.all([import('${moduleUrl}'), import('${sleepModuleUrl}')]).then(([countdown, sleep]) => {
+    const start = countdown.parseJstDateTimeLocal('2026-07-08T22:00');
+    const end = countdown.parseJstDateTimeLocal('2026-07-09T07:00');
+    const awake = sleep.getAwakeDurationMs(start, end, { enabled: true, start: '23:00', end: '06:00' });
+    process.stdout.write(JSON.stringify({ start, awake }));
+  })`;
   const run = (tz) => execFileSync(process.execPath, ["--input-type=module", "--eval", script], {
     env: { ...process.env, TZ: tz }, encoding: "utf8",
   });

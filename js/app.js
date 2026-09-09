@@ -22,6 +22,12 @@ import {
   mergeImportedTimers,
   parseQrPayload,
 } from "./transfer.js";
+import {
+  createSleepSettingsStorage,
+  DEFAULT_SLEEP_SETTINGS,
+  formatSleepSchedule,
+  validateSleepSettings,
+} from "./sleep.js";
 
 const elements = {
   openButton: document.querySelector("#open-form-button"),
@@ -44,6 +50,16 @@ const elements = {
   deleteName: document.querySelector("#delete-name"),
   deleteCancel: document.querySelector("#delete-cancel"),
   deleteConfirm: document.querySelector("#delete-confirm"),
+  openSleepButton: document.querySelector("#open-sleep-button"),
+  sleepDialog: document.querySelector("#sleep-dialog"),
+  sleepForm: document.querySelector("#sleep-form"),
+  closeSleepButton: document.querySelector("#close-sleep-button"),
+  cancelSleepButton: document.querySelector("#cancel-sleep-button"),
+  sleepEnabled: document.querySelector("#sleep-enabled"),
+  sleepStart: document.querySelector("#sleep-start"),
+  sleepEnd: document.querySelector("#sleep-end"),
+  sleepFormError: document.querySelector("#sleep-form-error"),
+  sleepSummary: document.querySelector("#sleep-summary"),
   openShareButton: document.querySelector("#open-share-button"),
   shareDialog: document.querySelector("#share-dialog"),
   closeShareButton: document.querySelector("#close-share-button"),
@@ -63,6 +79,8 @@ const elements = {
 let timers = [];
 let deleteCandidateId = null;
 let repository = null;
+let sleepRepository = null;
+let sleepSettings = { ...DEFAULT_SLEEP_SETTINGS };
 let cameraStream = null;
 let cameraScanTimer = null;
 let cameraSessionId = 0;
@@ -97,7 +115,7 @@ function getSortedTimers() {
 function createTimerCard(timer, nowMs) {
   const card = elements.template.content.firstElementChild.cloneNode(true);
   const targetMs = Date.parse(timer.targetAt);
-  const countdown = getCountdown(targetMs, nowMs);
+  const countdown = getCountdown(targetMs, nowMs, sleepSettings);
   card.dataset.id = timer.id;
   card.classList.toggle("ended", countdown.ended);
   card.querySelector(".status-text").textContent = countdown.ended ? "終了済み" : "予定";
@@ -122,6 +140,7 @@ function render() {
   elements.empty.hidden = timers.length !== 0;
   elements.openButton.disabled = atLimit;
   elements.limitMessage.hidden = !atLimit;
+  elements.sleepSummary.textContent = formatSleepSchedule(sleepSettings);
   const hasTimers = timers.length > 0;
   elements.showShareQrButton.disabled = !hasTimers;
 }
@@ -146,6 +165,48 @@ function openForm(timer = null) {
 
 function closeForm() {
   elements.dialog.close();
+}
+
+function showSleepFormError(text) {
+  elements.sleepFormError.textContent = text;
+  elements.sleepFormError.hidden = !text;
+}
+
+function openSleepForm() {
+  elements.sleepEnabled.checked = sleepSettings.enabled;
+  elements.sleepStart.value = sleepSettings.start;
+  elements.sleepEnd.value = sleepSettings.end;
+  showSleepFormError("");
+  elements.sleepDialog.showModal();
+  elements.sleepEnabled.focus();
+}
+
+function closeSleepForm() {
+  elements.sleepDialog.close();
+}
+
+function saveSleepForm(event) {
+  event.preventDefault();
+  showSleepFormError("");
+  const nextSettings = {
+    enabled: elements.sleepEnabled.checked,
+    start: elements.sleepStart.value,
+    end: elements.sleepEnd.value,
+  };
+  const validation = validateSleepSettings(nextSettings);
+  if (!validation.valid) {
+    showSleepFormError(`⚠ ${validation.message}`);
+    return;
+  }
+
+  try {
+    sleepSettings = sleepRepository.save(nextSettings);
+    closeSleepForm();
+    render();
+    showMessage("睡眠時間の設定を保存しました。", "success");
+  } catch (error) {
+    showSleepFormError(`⚠ ${error.message}`);
+  }
 }
 
 function makeUniqueId() {
@@ -410,18 +471,30 @@ function registerServiceWorker() {
 }
 
 function init() {
+  const startupMessages = [];
   try {
     repository = createTimerStorage(window.localStorage);
     const result = repository.load();
     timers = result.timers;
-    showMessage(result.warning, "warning");
+    if (result.warning) startupMessages.push(result.warning);
   } catch (error) {
     // メモリ上では閲覧できる状態を維持し、保存時には同じ説明を返す。
-    showMessage(`⚠ ${error.message}`, "error");
+    startupMessages.push(`⚠ ${error.message}`);
     repository = { save() { throw error; } };
   }
+  try {
+    sleepRepository = createSleepSettingsStorage(window.localStorage);
+    const result = sleepRepository.load();
+    sleepSettings = result.settings;
+    if (result.warning) startupMessages.push(result.warning);
+  } catch (error) {
+    startupMessages.push(`⚠ ${error.message}`);
+    sleepRepository = { save() { throw error; } };
+  }
+  showMessage(startupMessages.join(" "), startupMessages.some((message) => message.startsWith("⚠")) ? "error" : "warning");
   render();
   elements.openButton.addEventListener("click", () => openForm());
+  elements.openSleepButton.addEventListener("click", openSleepForm);
   elements.openShareButton.addEventListener("click", openShareDialog);
   elements.closeButton.addEventListener("click", closeForm);
   elements.cancelButton.addEventListener("click", closeForm);
@@ -429,6 +502,9 @@ function init() {
   elements.list.addEventListener("click", handleListClick);
   elements.deleteCancel.addEventListener("click", () => elements.deleteDialog.close());
   elements.deleteConfirm.addEventListener("click", confirmDelete);
+  elements.closeSleepButton.addEventListener("click", closeSleepForm);
+  elements.cancelSleepButton.addEventListener("click", closeSleepForm);
+  elements.sleepForm.addEventListener("submit", saveSleepForm);
   elements.closeShareButton.addEventListener("click", closeShareDialog);
   elements.shareDoneButton.addEventListener("click", closeShareDialog);
   elements.showShareQrButton.addEventListener("click", showShareQr);

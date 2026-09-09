@@ -1,5 +1,5 @@
 // この名前を変更すると、新版のinstall後に旧キャッシュがactivateで削除される。
-const CACHE_NAME = "countdown-static-v7";
+const CACHE_NAME = "countdown-static-v8";
 const CACHE_PREFIX = "countdown-static-";
 const APP_SHELL = [
   "./",
@@ -8,6 +8,7 @@ const APP_SHELL = [
   "./js/app.js",
   "./js/countdown.js",
   "./js/qr-code.js",
+  "./js/sleep.js",
   "./js/storage.js",
   "./js/transfer.js",
   "./manifest.webmanifest",

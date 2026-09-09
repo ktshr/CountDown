@@ -87,6 +87,7 @@ h1 { margin: 0; font-size: clamp(1.9rem, 9vw, 3rem); line-height: 1.1; letter-sp
 .summary h2 { margin: 0; font-size: 1.15rem; }
 .summary p { margin: 0; }
 #count-label { color: var(--muted); font-variant-numeric: tabular-nums; }
+.sleep-summary { margin: -6px 0 18px; color: var(--muted); font-size: .9rem; }
 
 .empty-state { padding: 42px 22px; border: 1px dashed #b9c4d8; border-radius: 20px; text-align: center; background: rgb(255 255 255 / 60%); }
 .empty-state h2 { margin: 10px 0 8px; font-size: 1.2rem; }
@@ -125,6 +126,10 @@ dialog::backdrop { background: rgb(14 22 38 / 56%); backdrop-filter: blur(3px); 
 .field label span { color: var(--danger); font-size: .75rem; }
 .field input { width: 100%; min-height: 48px; border: 1px solid #aeb9ca; border-radius: 10px; padding: 10px 12px; background: var(--surface); color: var(--text); }
 .field small { display: block; margin-top: 7px; color: var(--muted); line-height: 1.5; }
+.check-field { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-bottom: 18px; font-weight: 700; cursor: pointer; }
+.check-field input { width: 22px; height: 22px; margin: 0; accent-color: var(--primary); }
+.sleep-time-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 14px; }
+.field-note { margin: -8px 0 20px; color: var(--muted); font-size: .88rem; line-height: 1.5; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; }
 .form-error { margin-top: 4px; }
 .share-dialog { width: min(calc(100% - 24px), 640px); }
@@ -152,12 +157,17 @@ dialog::backdrop { background: rgb(14 22 38 / 56%); backdrop-filter: blur(3px); 
 [hidden] { display: none !important; }
 
 @media (min-width: 620px) {
-  .app-header { flex-direction: row; justify-content: space-between; align-items: center; padding-block: 52px 34px; }
-  .header-actions { grid-template-columns: repeat(2, auto); }
+  .app-header { padding-block: 52px 34px; }
+  .header-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .summary { flex-direction: row; justify-content: space-between; align-items: center; }
   .timer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .qr-guide { grid-template-columns: minmax(0, 1fr) 220px; }
   .share-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sleep-time-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 820px) {
+  .app-header { flex-direction: row; justify-content: space-between; align-items: center; }
+  .header-actions { grid-template-columns: repeat(3, auto); }
 }
 @media (min-width: 940px) { .timer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (prefers-reduced-motion: no-preference) {
