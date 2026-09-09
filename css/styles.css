@@ -117,6 +117,7 @@ h1 { margin: 0; font-size: clamp(1.9rem, 9vw, 3rem); line-height: 1.1; letter-sp
 .qr-link img { display: block; width: 100%; height: auto; border-radius: inherit; }
 
 dialog { width: min(calc(100% - 24px), 520px); max-height: calc(100dvh - 24px); padding: 0; border: 0; border-radius: 20px; background: var(--surface); color: var(--text); box-shadow: 0 24px 80px rgb(10 20 40 / 28%); }
+#sleep-dialog { width: min(calc(100% - 24px), 620px); }
 dialog::backdrop { background: rgb(14 22 38 / 56%); backdrop-filter: blur(3px); }
 #timer-form, .confirm-content, .share-content { padding: 22px; }
 .dialog-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
